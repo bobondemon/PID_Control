@@ -35,58 +35,44 @@ There's an experimental patch for windows in this [PR](https://github.com/udacit
 3. Compile: `cmake .. && make`
 4. Run it: `./pid`. 
 
-## Editor Settings
+## [Rubric](https://review.udacity.com/#!/rubrics/824/view)
 
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
+### Maunaully tunning
 
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
+The P.I.D parameters are first chosen by hand. I first try "`Kp=0.4; Ki=0; Kd=2`" and found that it had many wiggling effects. This is because the large `Kp` coefficient makes **overshooting.** Then I reduced the `Kp` value and set `Kp=0.2` as the manual result.
 
-## Code Style
+In addition, I found that it is hard to tune `Ki` because the *integral error* is typically larger than *proportional error* in hundreds of magnitude. So I just set it to zero and left it be tuned by twiddling function.
 
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
+### Twiddle
 
-## Project Instructions and Rubric
+In order to evaluate each "`Kp,Ki,Kd`" setting, we need to **restart** the simulator. By sending `"42[\"reset\",{}]"` to WebSocket, simulator is able to restart. The twiddling function can then test the performance of each setting and found the best results.
 
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
+>Each perforamnce evaluation is tested in time stamps 3000 (`#define TWIDDLE_TIME_NUM 3000` in program), which is about 59 seconds. Then twiddling function will update the parameters and restart simulator.
 
-More information is only accessible by people who are already enrolled in Term 2
-of CarND. If you are enrolled, see [the project page](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/f1820894-8322-4bb3-81aa-b26b3c6dcbaf/lessons/e8235395-22dd-4b87-88e0-d108c5e5bbf4/concepts/6a4d8d42-6a04-4aa6-b284-1697c0fd6562)
-for instructions and the project rubric.
+The initial setting is found by manually tunning: "`Kp=0.4; Ki=0; Kd=2`", and I set the initial step size as:
+```c++
+twiddle_step_size[0] = 0.01; // pd[0] in course lecture
+twiddle_step_size[1] = 0.0001; // pd[1] in course lecture
+twiddle_step_size[2] = 0.01; // pd[2] in course lecture
+```
 
-## Hints!
+Moreover, the tolerance, `tol`, is set to `0.01`, and if "`cur_tol<tol`", the twiddling function converges.
+One thing that is different from the course is the calculation of `cur_tol`. Instead of using `sum(pd)` as in the course lecture, I used:
+```c++
+double cur_tol = twiddle_step_size[0]+twiddle_step_size[1]*100+twiddle_step_size[2];
+```
+I scaled 100 times of `twiddle_step_size[1]` (`pd[1]`). This is because the *integral error* is typically larger than *proportional error* in hundreds of magnitude.
 
-* You don't have to follow this directory structure, but if you do, your work
-  will span all of the .cpp files here. Keep an eye out for TODOs.
+As we can see in the following figure, `cur_tol` converges toward `tol` in the 84th iteration. (about 84 mins)
+<img src="twiddle_tolerance_plot.png" width=80% height=80%>
 
-## Call for IDE Profiles Pull Requests
+### Results
 
-Help your fellow students!
+The 84th iteration got the following results:
 
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to we ensure
-that students don't feel pressured to use one IDE or another.
-
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
-
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
-
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
-
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
-
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
+```c++
+double Init_Kp = 0.211;
+double Init_Ki = 0.0003189;
+double Init_Kd = 2.00109;
+```
+It can successfully drive a lap around the track!
